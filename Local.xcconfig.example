@@ -1,0 +1,4 @@
+// Copy to Local.xcconfig (git-ignored). Needed once the widget exists,
+// because the app and widget share an App Group.
+// Find your team ID at https://developer.apple.com/account → Membership.
+DEVELOPMENT_TEAM =

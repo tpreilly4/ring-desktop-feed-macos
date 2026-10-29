@@ -1,0 +1,27 @@
+{
+  "name": "ring-desktop-feed-helper",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Background helper for Ring Desktop Feed: talks to Ring via ring-client-api and serves the local player.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "RDF_DEV=1 tsx src/main.ts",
+    "sign-in": "tsx src/dev-sign-in.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "ring-client-api": "14.3.0",
+    "werift": "0.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4",
+    "typescript": "^5"
+  }
+}

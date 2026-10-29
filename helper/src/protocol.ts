@@ -1,0 +1,27 @@
+// Messages the helper writes to stdout, one JSON object per line.
+// The Swift app reads these to learn the port, persist rotated tokens, etc.
+// Anything else (logs) goes to stderr.
+
+export type HelperEvent =
+  | { type: 'ready'; port: number }
+  | { type: 'refreshToken'; value: string }
+  | { type: 'signedOut'; reason: string }
+  | { type: 'error'; message: string }
+
+export function emit(event: HelperEvent) {
+  process.stdout.write(JSON.stringify(event) + '\n')
+}
+
+// Startup config the app sends as the first line on stdin.
+export interface HelperConfig {
+  // Bearer token every HTTP request must carry. Random per launch.
+  authToken: string
+  // Ring refresh token from the Keychain, if signed in.
+  refreshToken?: string
+  // 0 = pick a random free port.
+  port: number
+}
+
+export function log(...args: unknown[]) {
+  console.error(new Date().toISOString(), ...args)
+}

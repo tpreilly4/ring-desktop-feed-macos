@@ -1,0 +1,12 @@
+.DS_Store
+node_modules/
+helper/dist/
+vendor/
+build/
+DerivedData/
+*.xcodeproj/
+Local.xcconfig
+.env
+*.token
+xcuserdata/
+.claude/settings.local.json
