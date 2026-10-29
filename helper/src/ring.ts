@@ -8,6 +8,8 @@ export interface CameraSummary {
   name: string
   model: string
   hasBattery: boolean
+  // 0–100, or null when Ring doesn't report one (e.g. wired cameras).
+  batteryLevel: number | null
   isOffline: boolean
 }
 
@@ -36,6 +38,9 @@ export class RingAccount implements RingGateway {
       controlCenterDisplayName: 'Ring Desktop Feed',
       // Never wake battery cameras just for a periodic snapshot.
       avoidSnapshotBatteryDrain: true,
+      // Keeps battery level and online status fresh. This is a REST poll,
+      // it doesn't wake the cameras.
+      cameraStatusPollingSeconds: 300,
     })
     this.api.onRefreshTokenUpdated.subscribe(({ newRefreshToken }) =>
       onRefreshToken(newRefreshToken),
@@ -82,6 +87,7 @@ function summarize(camera: RingCamera): CameraSummary {
     name: camera.name,
     model: camera.model,
     hasBattery: camera.hasBattery,
+    batteryLevel: camera.batteryLevel,
     isOffline: camera.isOffline,
   }
 }

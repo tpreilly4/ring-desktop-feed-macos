@@ -1,5 +1,8 @@
 import SwiftUI
 import WebKit
+import os
+
+private let playerLog = Logger(subsystem: "com.tompreilly.ringdesktopfeed", category: "player")
 
 /// The helper's web player in a WKWebView. Unloading the page ends the Ring
 /// session, so this view going away stops the stream.
@@ -18,6 +21,7 @@ struct PlayerView: NSViewRepresentable {
         config.mediaTypesRequiringUserActionForPlayback = []
         config.userContentController.add(context.coordinator, name: "rdf")
         let webView = WKWebView(frame: .zero, configuration: config)
+        playerLog.notice("make web view for camera \(camera.id)")
         webView.setValue(false, forKey: "drawsBackground")
         webView.load(URLRequest(url: url))
         context.coordinator.loadedCamera = camera.id
@@ -36,6 +40,7 @@ struct PlayerView: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
+        playerLog.notice("dismantle web view")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "rdf")
         webView.load(URLRequest(url: URL(string: "about:blank")!))
         // The page may not get to say goodbye, so end the Ring session here too.
@@ -61,6 +66,7 @@ struct PlayerView: NSViewRepresentable {
             guard let body = message.body as? [String: Any], let raw = body["state"] as? String else { return }
             if let id = body["sessionId"] as? String { sessionId = id }
             let detail = body["detail"] as? String ?? ""
+            playerLog.notice("player state \(raw, privacy: .public) \(detail, privacy: .public)")
             onStateChange(PlayerState(raw: raw, detail: detail))
         }
     }

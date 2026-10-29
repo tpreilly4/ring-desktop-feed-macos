@@ -11,8 +11,8 @@ class FakeRing implements RingGateway {
   ended: string[] = []
   disconnected = false
   cameras: CameraSummary[] = [
-    { id: 1, name: 'Floodlight', model: 'Floodlight Cam', hasBattery: false, isOffline: false },
-    { id: 2, name: 'Front Door', model: 'Video Doorbell 2', hasBattery: true, isOffline: false },
+    { id: 1, name: 'Floodlight', model: 'Floodlight Cam', hasBattery: false, batteryLevel: null, isOffline: false },
+    { id: 2, name: 'Front Door', model: 'Video Doorbell 2', hasBattery: true, batteryLevel: 72, isOffline: false },
   ]
   async listCameras() {
     return this.cameras
@@ -137,6 +137,11 @@ describe('live view', () => {
   test('lists cameras', async () => {
     const res = await call('GET', '/api/cameras')
     assert.deepEqual(res.body.map((c: CameraSummary) => c.name), ['Floodlight', 'Front Door'])
+  })
+
+  test('includes battery level, null for wired cameras', async () => {
+    const res = await call('GET', '/api/cameras')
+    assert.deepEqual(res.body.map((c: CameraSummary) => c.batteryLevel), [null, 72])
   })
 
   test('relays the offer to Ring and returns its answer', async () => {

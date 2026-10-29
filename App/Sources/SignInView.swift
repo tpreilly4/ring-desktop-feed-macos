@@ -75,17 +75,15 @@ struct SignInView: View {
 
 /// Hosts the sign-in form in a normal window, where AutoFill works.
 struct SignInWindow: View {
-    static let id = "sign-in"
-
     let helper: Helper
-    @Environment(\.dismissWindow) private var dismissWindow
+    let onDone: () -> Void
 
     var body: some View {
         Group {
             if let client = helper.client {
                 SignInView(client: client) {
                     helper.noteAccountChanged()
-                    dismissWindow(id: Self.id)
+                    onDone()
                 }
             } else {
                 ProgressView("Starting…")

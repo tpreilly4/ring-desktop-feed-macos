@@ -5,6 +5,8 @@ struct Camera: Decodable, Identifiable, Hashable {
     let name: String
     let model: String
     let hasBattery: Bool
+    /// 0–100, nil when Ring doesn't report one.
+    let batteryLevel: Double?
     let isOffline: Bool
 }
 
