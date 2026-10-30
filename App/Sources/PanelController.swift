@@ -62,7 +62,8 @@ final class PanelController: NSObject, NSWindowDelegate {
             close: { [weak self] in self?.hide() },
             toggleOnTop: { [weak self] in self?.toggleOnTop() },
             signIn: { [weak self] in self?.showSignIn() },
-            settings: { [weak self] in self?.showSettings() }
+            settings: { [weak self] in self?.showSettings() },
+            layoutChanged: { [weak self] in self?.layoutChanged() }
         )
         let root = FeedPanelView(viewer: viewer, panel: state, actions: actions) { [weak self] size in
             self?.attachedSizeChanged(size)
@@ -168,6 +169,10 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.orderOut(nil)
         state.mode = .attached
         applyMode()
+        if !viewer.showAll {
+            viewer.showAll = true
+            layoutChanged()
+        }
     }
 
     func windowDidResignKey(_ notification: Notification) {
@@ -300,7 +305,45 @@ final class PanelController: NSObject, NSWindowDelegate {
 
     // MARK: Modes and sizing
 
+    /// The number of cameras on screen changed.
+    private func layoutChanged() {
+        let columns = viewer.columns
+        updateMinSize()
+        // Where snapping back lands, known ahead of the view measuring itself.
+        let video = FeedPanelView.attachedVideoSize(columns: columns)
+        attachedSize = CGSize(width: video.width, height: video.height + FeedPanelView.barHeight)
+
+        guard state.visible, state.mode == .detached, !animating else { return }
+        // The mini-player grows sideways: each feed stays the size it was.
+        let visible = (panel.screen ?? NSScreen.main)?.visibleFrame ?? panel.frame
+        var frame = panel.frame
+        let tileWidth = (frame.height - FeedPanelView.barHeight) * 16 / 9
+        let width = min(tileWidth * CGFloat(columns), visible.width - 2 * screenMargin)
+        let height = FeedPanelView.videoHeight(width: width, columns: columns) + FeedPanelView.barHeight
+        frame.origin.y = frame.maxY - height
+        frame.size = NSSize(width: width, height: height)
+        frame.origin.x = max(visible.minX + screenMargin, min(frame.minX, visible.maxX - width - screenMargin))
+
+        animating = true
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().setFrame(frame, display: true)
+        } completionHandler: { [weak self] in
+            MainActor.assumeIsolated { self?.animating = false }
+        }
+    }
+
+    private func updateMinSize() {
+        let columns = viewer.columns
+        panel.minSize = NSSize(
+            width: 320 * CGFloat(columns),
+            height: FeedPanelView.videoHeight(width: 320 * CGFloat(columns), columns: columns) + FeedPanelView.barHeight
+        )
+    }
+
     private func applyMode() {
+        updateMinSize()
         switch state.mode {
         case .attached:
             panel.styleMask.remove(.resizable)
@@ -347,10 +390,10 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
 
     func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
-        // The mini-player keeps the video at 16:9 above the control bar.
+        // The mini-player keeps each feed at 16:9 above the control bar.
         guard state.mode == .detached, !animating else { return frameSize }
         let width = max(frameSize.width, sender.minSize.width)
-        return NSSize(width: width, height: (width * 9 / 16 + FeedPanelView.barHeight).rounded())
+        return NSSize(width: width, height: FeedPanelView.videoHeight(width: width, columns: viewer.columns) + FeedPanelView.barHeight)
     }
 
     // MARK: Sign-in
@@ -409,7 +452,7 @@ final class PanelController: NSObject, NSWindowDelegate {
 #if DEBUG
 /// Lets a terminal drive the panel and see where it lands, for debugging
 /// layout without clicking:
-///   swift scripts/panel-debug.swift open|detach|reattach|hide|settings
+///   swift scripts/panel-debug.swift open|detach|reattach|hide|settings|both|single
 /// Frames are logged under the "panel" category.
 extension PanelController {
     private static let logger = Logger(subsystem: "com.tompreilly.ringdesktopfeed", category: "panel")
@@ -430,6 +473,8 @@ extension PanelController {
         case "reattach": reattach()
         case "hide": hide()
         case "settings": showSettings()
+        case "both": viewer.showAll = true; layoutChanged()
+        case "single": viewer.showAll = false; layoutChanged()
         default: break
         }
         logFrame("after \(command ?? "?")")

@@ -6,7 +6,7 @@ A macOS menu bar app for watching your Ring cameras.
 
 ## What it does
 
-- Watch either camera live from the menu bar, or pop the view out into a floating mini-player. Video comes straight from Ring, with no re-encoding.
+- Watch one camera or both side by side from the menu bar, or pop the view out into a floating mini-player. Video comes straight from Ring, with no re-encoding.
 - See motion at a glance: the menu bar icon gets a red dot for 5 minutes.
 - Get a notification when the doorbell rings, and click it to watch live.
 - Optionally launch at login, from Settings (the ⋯ menu in the panel).

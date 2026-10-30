@@ -19,6 +19,7 @@ struct PanelActions {
     var toggleOnTop: () -> Void
     var signIn: () -> Void
     var settings: () -> Void
+    var layoutChanged: () -> Void
 }
 
 /// The one view behind both the menu bar popover and the floating
@@ -92,22 +93,47 @@ struct FeedPanelView: View {
                 Color.black
                 if viewer.cameras.isEmpty {
                     cantLoad
-                } else if let camera = viewer.selected, camera.isOffline {
-                    Label("\(camera.name) is offline", systemImage: "video.slash")
-                        .foregroundStyle(.secondary)
-                } else if panel.visible, let camera = viewer.selected {
-                    PlayerView(client: client, camera: camera, muted: viewer.muted)
-                        .id(camera.id)
+                } else {
+                    // Keyed by camera, so going to or from "Both" leaves the
+                    // stream that's already playing alone.
+                    HStack(spacing: 2) {
+                        ForEach(viewer.shown) { camera in
+                            tile(camera, client: client)
+                        }
+                    }
                 }
             }
             .frame(
-                width: attached ? Self.attachedVideoWidth : nil,
-                height: attached ? Self.attachedVideoWidth * 9 / 16 : nil
+                width: attached ? Self.attachedVideoSize(columns: viewer.columns).width : nil,
+                height: attached ? Self.attachedVideoSize(columns: viewer.columns).height : nil
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             bar
                 .frame(height: Self.barHeight)
+        }
+    }
+
+    @ViewBuilder
+    private func tile(_ camera: Camera, client: HelperClient) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            if camera.isOffline {
+                Label("\(camera.name) is offline", systemImage: "video.slash")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if panel.visible {
+                PlayerView(client: client, camera: camera, muted: viewer.muted)
+            }
+            if viewer.showAll {
+                Text(camera.name)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.black.opacity(0.55), in: .rect(cornerRadius: 4))
+                    .padding(6)
+                    .allowsHitTesting(false)
+            }
         }
     }
 
@@ -120,8 +146,8 @@ struct FeedPanelView: View {
 
             cameraPicker
 
-            if let selected = viewer.selected, selected.hasBattery {
-                BatteryLabel(level: selected.batteryLevel)
+            ForEach(viewer.shown.filter(\.hasBattery)) { camera in
+                BatteryLabel(level: camera.batteryLevel)
             }
 
             if !helper.ringReachable {
@@ -171,21 +197,41 @@ struct FeedPanelView: View {
     @ViewBuilder
     private var cameraPicker: some View {
         if viewer.cameras.count > 1 {
-            Picker("Camera", selection: Bindable(viewer).selectedId) {
+            Picker("Camera", selection: choice) {
                 ForEach(viewer.cameras) { camera in
                     Text(camera.name).tag(Optional(camera.id))
                 }
+                Text("Both").tag(Int?.none)
             }
+            .help("Both streams every camera, which uses the doorbell's battery while open")
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
         }
     }
 
+    /// The picker's value: a camera's id, or nil for "Both".
+    private var choice: Binding<Int?> {
+        Binding(
+            get: { viewer.showAll ? nil : viewer.selectedId },
+            set: { id in
+                viewer.showAll = id == nil
+                if let id { viewer.selectedId = id }
+                actions.layoutChanged()
+            }
+        )
+    }
+
     /// Capped so it still fits on smaller screens.
-    static var attachedVideoWidth: CGFloat {
+    static func attachedVideoSize(columns: Int) -> CGSize {
         let screen = NSScreen.main?.visibleFrame.width ?? 1440
-        return min(600, (screen * 0.6).rounded())
+        let width = columns > 1 ? min(1040, (screen * 0.85).rounded()) : min(600, (screen * 0.6).rounded())
+        return CGSize(width: width, height: videoHeight(width: width, columns: columns))
+    }
+
+    /// Each camera keeps 16:9, side by side.
+    static func videoHeight(width: CGFloat, columns: Int) -> CGFloat {
+        (width / CGFloat(columns) * 9 / 16).rounded()
     }
 
     // Sign-in lives in a real window: a panel hanging from the menu bar loses

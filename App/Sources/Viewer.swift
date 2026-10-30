@@ -11,6 +11,9 @@ final class Viewer {
     private(set) var cameras: [Camera] = []
     private(set) var error: String?
     var selectedId: Int?
+    /// Streams every camera side by side. The panel always opens this way;
+    /// picking one camera lasts until it closes.
+    var showAll = true
     var muted = true
 
     var alwaysOnTop: Bool {
@@ -27,6 +30,14 @@ final class Viewer {
 
     var selected: Camera? { cameras.first { $0.id == selectedId } }
 
+    /// The cameras on screen right now.
+    var shown: [Camera] {
+        if showAll { return cameras }
+        return selected.map { [$0] } ?? []
+    }
+
+    var columns: Int { max(shown.count, 1) }
+
     /// Identifies when cameras need refetching: a new helper, a sign-in/out,
     /// or Ring coming back.
     var refreshKey: RefreshKey { RefreshKey(port: helper.client?.port, account: helper.accountChanges, reachable: helper.ringReachable) }
@@ -42,8 +53,8 @@ final class Viewer {
             cameras = try await client.cameras()
             error = nil
             if selected == nil {
-                // Default to a wired camera, so opening a view doesn't wake
-                // the doorbell's battery.
+                // Used if "Both" is ever off without a camera picked. Prefer
+                // a wired one, which doesn't use the doorbell's battery.
                 selectedId = (cameras.first { !$0.hasBattery } ?? cameras.first)?.id
             }
         } catch {

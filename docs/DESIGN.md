@@ -33,7 +33,8 @@ A one-time sign-in screen in the app handles email, password and 2FA. The refres
 
 ## Live view
 
-- Streams only while the popover or mini-player is open, and only one camera at a time.
+- Streams only while the popover or mini-player is open.
+- Opens on "Both", which plays every camera side by side. That wakes the doorbell and uses its battery whenever the panel is open. Picking a single camera lasts until the panel closes.
 - Ring cuts streams off after about 10 minutes. The Floodlight then reconnects silently, and the doorbell shows a "Resume live" button.
 - Audio starts muted with an unmute toggle. There's no two-way talk.
 - The popover and the mini-player are one panel (our own `NSStatusItem` + `NSPanel`, not `MenuBarExtra`), so switching between them never restarts the stream.
