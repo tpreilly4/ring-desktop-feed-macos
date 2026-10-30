@@ -13,6 +13,10 @@ export interface CameraSummary {
   isOffline: boolean
 }
 
+// 'expired' means Ring refused our refresh token. A network problem is only
+// ever 'unreachable', so it can't sign anyone out.
+export type RingHealth = 'ok' | 'unreachable' | 'expired'
+
 export interface LiveViewStart {
   sessionId: string
   answerSdp: string
@@ -25,8 +29,11 @@ export interface RingGateway {
   // flows straight from Ring to the player with no re-encoding in between.
   startLiveView(cameraId: number, offerSdp: string): Promise<LiveViewStart>
   endLiveView(sessionId: string): Promise<void>
+  checkHealth(): Promise<RingHealth>
   disconnect(): Promise<void>
 }
+
+const healthTimeoutMs = 20_000
 
 export interface CameraEvent {
   kind: 'motion' | 'ding'
@@ -37,6 +44,7 @@ export interface CameraEvent {
 export class RingAccount implements RingGateway {
   private readonly api: RingApi
   private readonly sessions = new Map<string, SimpleWebRtcSession>()
+  private healthCheck?: Promise<RingHealth>
 
   constructor(refreshToken: string, onRefreshToken: (token: string) => void) {
     this.api = new RingApi({
@@ -85,6 +93,29 @@ export class RingAccount implements RingGateway {
         onEvent({ kind, cameraId: camera.id, cameraName: camera.name })
       })
     }
+  }
+
+  // ring-client-api retries network failures forever, so a request can hang
+  // for as long as we're offline: time out the wait, and reuse the request
+  // still in flight rather than piling up another each time.
+  async checkHealth(): Promise<RingHealth> {
+    this.healthCheck ??= this.api
+      .fetchRingDevices()
+      .then((): RingHealth => 'ok')
+      .catch((e): RingHealth => {
+        log('health check failed', e)
+        return /refresh token is not valid/i.test(String(e?.message)) ? 'expired' : 'unreachable'
+      })
+      .finally(() => {
+        this.healthCheck = undefined
+      })
+    let timer: NodeJS.Timeout | undefined
+    const timedOut = new Promise<RingHealth>((resolve) => {
+      timer = setTimeout(() => resolve('unreachable'), healthTimeoutMs)
+    })
+    const health = await Promise.race([this.healthCheck, timedOut])
+    clearTimeout(timer)
+    return health
   }
 
   async disconnect() {

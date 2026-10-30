@@ -8,6 +8,8 @@ import { createHelperServer } from './server.js'
 
 const config = await readConfig()
 
+const connectionCheckEveryMs = 2 * 60 * 1000
+
 function connect(token: string) {
   const account = new RingAccount(token, persistRefreshToken)
   account
@@ -21,7 +23,8 @@ const app = new HelperApp(
     signIn: new SignInFlow(),
     connect,
     persistRefreshToken,
-    onSignedOut: () => emit({ type: 'signedOut', reason: 'user' }),
+    onSignedOut: (reason) => emit({ type: 'signedOut', reason }),
+    onReachabilityChanged: (reachable) => emit({ type: 'reachability', reachable }),
   },
   config.refreshToken,
 )
@@ -37,6 +40,8 @@ server.listen(config.port, '127.0.0.1', () => {
   const port = typeof address === 'object' && address ? address.port : config.port
   emit({ type: 'ready', port })
   log(`helper listening on 127.0.0.1:${port}${isDev ? ' (dev mode, token "dev")' : ''}`)
+  app.checkConnection()
+  setInterval(() => app.checkConnection(), connectionCheckEveryMs)
 })
 
 async function shutdown() {

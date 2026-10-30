@@ -4,12 +4,13 @@ import { after, before, beforeEach, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { HelperApp, type SignIn } from '../src/app.ts'
 import type { SignInResult } from '../src/auth.ts'
-import type { CameraSummary, RingGateway } from '../src/ring.ts'
+import type { CameraSummary, RingGateway, RingHealth } from '../src/ring.ts'
 import { createHelperServer } from '../src/server.ts'
 
 class FakeRing implements RingGateway {
   ended: string[] = []
   disconnected = false
+  health: RingHealth = 'ok'
   cameras: CameraSummary[] = [
     { id: 1, name: 'Floodlight', model: 'Floodlight Cam', hasBattery: false, batteryLevel: null, isOffline: false },
     { id: 2, name: 'Front Door', model: 'Video Doorbell 2', hasBattery: true, batteryLevel: 72, isOffline: false },
@@ -22,6 +23,9 @@ class FakeRing implements RingGateway {
   }
   async endLiveView(sessionId: string) {
     this.ended.push(sessionId)
+  }
+  async checkHealth() {
+    return this.health
   }
   async disconnect() {
     this.disconnected = true
@@ -46,16 +50,21 @@ let server: ReturnType<typeof createHelperServer>
 let ring: FakeRing
 let persisted: string[]
 let app: HelperApp
+let signedOutReasons: string[]
+let reachability: boolean[]
 
 function setUp(refreshToken?: string) {
   ring = new FakeRing()
   persisted = []
+  signedOutReasons = []
+  reachability = []
   app = new HelperApp(
     {
       signIn: new FakeSignIn(),
       connect: () => ring,
       persistRefreshToken: (t) => persisted.push(t),
-      onSignedOut: () => {},
+      onSignedOut: (reason) => signedOutReasons.push(reason),
+      onReachabilityChanged: (reachable) => reachability.push(reachable),
     },
     refreshToken,
   )
@@ -162,5 +171,42 @@ describe('live view', () => {
     await call('POST', '/api/auth/sign-out')
     assert.equal(ring.disconnected, true)
     assert.deepEqual((await call('GET', '/api/status')).body, { signedIn: false })
+  })
+})
+
+describe('connection checks', () => {
+  beforeEach(() => setUp('stored-token'))
+
+  test('an expired token signs out, with its own reason', async () => {
+    ring.health = 'expired'
+    await app.checkConnection()
+    assert.deepEqual(signedOutReasons, ['expired'])
+    assert.equal(ring.disconnected, true)
+    assert.deepEqual((await call('GET', '/api/status')).body, { signedIn: false })
+  })
+
+  test('losing Ring reports once and stays signed in, then reports recovery', async () => {
+    ring.health = 'unreachable'
+    await app.checkConnection()
+    await app.checkConnection()
+    assert.deepEqual(reachability, [false])
+    assert.deepEqual(signedOutReasons, [])
+    assert.deepEqual((await call('GET', '/api/status')).body, { signedIn: true })
+
+    ring.health = 'ok'
+    await app.checkConnection()
+    assert.deepEqual(reachability, [false, true])
+  })
+
+  test('a healthy connection reports nothing', async () => {
+    await app.checkConnection()
+    assert.deepEqual(reachability, [])
+  })
+
+  test('does nothing when signed out', async () => {
+    await call('POST', '/api/auth/sign-out')
+    ring.health = 'expired'
+    await app.checkConnection()
+    assert.deepEqual(signedOutReasons, ['user'])
   })
 })

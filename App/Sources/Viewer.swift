@@ -27,8 +27,9 @@ final class Viewer {
 
     var selected: Camera? { cameras.first { $0.id == selectedId } }
 
-    /// Identifies when cameras need refetching: a new helper, or a sign-in/out.
-    var refreshKey: RefreshKey { RefreshKey(port: helper.client?.port, account: helper.accountChanges) }
+    /// Identifies when cameras need refetching: a new helper, a sign-in/out,
+    /// or Ring coming back.
+    var refreshKey: RefreshKey { RefreshKey(port: helper.client?.port, account: helper.accountChanges, reachable: helper.ringReachable) }
 
     func refresh() async {
         guard let client = helper.client else { return }
@@ -59,4 +60,5 @@ final class Viewer {
 struct RefreshKey: Equatable {
     let port: Int?
     let account: Int
+    let reachable: Bool
 }

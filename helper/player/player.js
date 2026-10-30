@@ -34,9 +34,10 @@ function setState(state, detail = '') {
   window.webkit?.messageHandlers?.rdf?.postMessage({ state, detail, sessionId })
 }
 
-async function api(method, path, body) {
+async function api(method, path, body, timeoutMs) {
   const res = await fetch(path, {
     method,
+    signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   })
@@ -85,14 +86,15 @@ async function start() {
   try {
     await peer.setLocalDescription(await peer.createOffer())
     await waitForIceGathering(peer)
-    const answer = await api('POST', '/api/live', { cameraId, sdp: peer.localDescription.sdp })
+    // Offline, the helper's request to Ring never returns.
+    const answer = await api('POST', '/api/live', { cameraId, sdp: peer.localDescription.sdp }, 30_000)
     if (pc !== peer) return
     sessionId = answer.sessionId
     await peer.setRemoteDescription({ type: 'answer', sdp: answer.sdp })
   } catch (e) {
     if (pc !== peer) return
     await teardown()
-    setState('error', e.message)
+    setState('error', e.name === 'TimeoutError' ? "Couldn't reach Ring." : e.message)
   }
 }
 

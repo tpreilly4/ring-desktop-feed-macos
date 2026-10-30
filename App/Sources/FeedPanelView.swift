@@ -18,6 +18,7 @@ struct PanelActions {
     var close: () -> Void
     var toggleOnTop: () -> Void
     var signIn: () -> Void
+    var settings: () -> Void
 }
 
 /// The one view behind both the menu bar popover and the floating
@@ -63,8 +64,14 @@ struct FeedPanelView: View {
         case (.failed(let text), _, _):
             message {
                 Label(text, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
-                quitButton
+                HStack {
+                    quitButton
+                    Button("Try Again") { helper.retry() }
+                        .keyboardShortcut(.defaultAction)
+                }
             }
+        case (.ready, _, nil) where viewer.error != nil:
+            message { cantLoad }
         default:
             message { ProgressView() }
         }
@@ -83,11 +90,14 @@ struct FeedPanelView: View {
         VStack(spacing: 0) {
             ZStack {
                 Color.black
-                if panel.visible, let camera = viewer.selected {
+                if viewer.cameras.isEmpty {
+                    cantLoad
+                } else if let camera = viewer.selected, camera.isOffline {
+                    Label("\(camera.name) is offline", systemImage: "video.slash")
+                        .foregroundStyle(.secondary)
+                } else if panel.visible, let camera = viewer.selected {
                     PlayerView(client: client, camera: camera, muted: viewer.muted)
                         .id(camera.id)
-                } else if viewer.cameras.isEmpty {
-                    Text(viewer.error ?? "No cameras found").foregroundStyle(.secondary)
                 }
             }
             .frame(
@@ -114,6 +124,14 @@ struct FeedPanelView: View {
                 BatteryLabel(level: selected.batteryLevel)
             }
 
+            if !helper.ringReachable {
+                Label("Can't reach Ring", systemImage: "exclamationmark.triangle.fill")
+                    .labelStyle(.titleAndIcon)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize()
+            }
+
             // Empty bar space: in the mini-player, this is what you drag.
             Color.clear
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -129,7 +147,8 @@ struct FeedPanelView: View {
                 Button("Pop Out", systemImage: "pip.exit", action: actions.detach)
                     .help("Pop out into a floating mini-player")
                 Menu("More", systemImage: "ellipsis.circle") {
-                    Button("Sign Out") { Task { await viewer.signOut() } }
+                    Button("Settings…", action: actions.settings)
+                        .keyboardShortcut(",")
                     Divider()
                     Button("Quit Ring Desktop Feed") { NSApplication.shared.terminate(nil) }
                 }
@@ -182,6 +201,17 @@ struct FeedPanelView: View {
             }
         }
         .frame(maxWidth: .infinity, minHeight: 120)
+    }
+
+    /// Couldn't get the camera list: why, and a way to ask again.
+    private var cantLoad: some View {
+        VStack(spacing: 8) {
+            Text(viewer.error ?? "No cameras found")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+            Button("Try Again") { Task { await viewer.refresh() } }
+        }
+        .padding()
     }
 
     private var quitButton: some View {

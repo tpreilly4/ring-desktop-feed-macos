@@ -47,18 +47,19 @@ A one-time sign-in screen in the app handles email, password and 2FA. The refres
 - A doorbell press shows a macOS notification that opens live view. Motion doesn't notify.
 - Push notifications go through `@eneris/push-receiver`. The helper pins 4.4.0 with an npm override, because 4.3.0 (the version `ring-client-api` asks for) misreads Ring's `crypto-key` header and fails to decrypt every push.
 - The icon is a plain camera normally, shows a dot for 5 minutes after motion, switches to a doorbell symbol for 1 minute after a press, and shows a warning variant when it loses contact with Ring.
-- The app launches at login.
 
 ## Failure handling
 
-- If the helper crashes, the app restarts it automatically.
-- If the sign-in expires, a notification appears and the sign-in screen opens.
-- If Ring can't be reached, the menu bar icon shows a warning.
+- If the helper crashes, the app restarts it with growing delays. After 5 failed starts in a row it stops and shows the problem with a "Try Again" button.
+- The helper checks its connection to Ring every 2 minutes. `ring-client-api` retries network failures forever, so requests are timed out on our side (the check after 20 seconds, the app's API calls after 30, and starting live view after 30).
+- If Ring can't be reached, the menu bar icon and the panel's bar show a warning that clears by itself once Ring is back.
+- If Ring refuses the token, a notification appears and the sign-in window opens. The library reports any failed token refresh this way, including an error on Ring's side, so the Keychain token isn't deleted: the next launch tries it again, and a new sign-in replaces it. Only "Sign Out" deletes it.
+- An offline camera says so in place of the video.
 - Logs go to `~/Library/Logs/RingDesktopFeed/`.
 
 ## Settings
 
-Launch at login, stay-on-top default, and sign out.
+A separate window, opened from the panel's ⋯ menu: launch at login (off by default, via `SMAppService`), keep the mini-player on top, sign out, and a shortcut to the logs.
 
 ## Repo hygiene
 
@@ -77,7 +78,7 @@ Launch at login, stay-on-top default, and sign out.
 
 ## Testing
 
-The helper's logic gets automated tests against a fake Ring layer. That covers refreshing tokens and the reconnect rules. The UI and streaming are checked by hand on the real cameras.
+The helper's logic gets automated tests against a fake Ring layer. That covers sign-in, live view requests and the connection rules (expiry versus lost contact). The UI and streaming are checked by hand on the real cameras.
 
 ## v2 candidates
 

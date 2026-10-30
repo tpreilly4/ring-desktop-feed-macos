@@ -27,6 +27,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel?.noteActivity(activity)
             if case .ding(let id, let name) = activity { notifier?.ding(cameraId: id, cameraName: name) }
         }
+        helper.onSignInExpired = { [weak panel, weak notifier] in
+            notifier?.signInExpired()
+            panel?.showSignIn()
+        }
         helper.start()
         self.helper = helper
         self.panel = panel

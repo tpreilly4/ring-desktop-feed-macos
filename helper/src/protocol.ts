@@ -5,7 +5,9 @@
 export type HelperEvent =
   | { type: 'ready'; port: number }
   | { type: 'refreshToken'; value: string }
-  | { type: 'signedOut'; reason: string }
+  // 'expired' means Ring refused the token, so the user must sign in again.
+  | { type: 'signedOut'; reason: 'user' | 'expired' }
+  | { type: 'reachability'; reachable: boolean }
   | { type: 'error'; message: string }
   // A motion or doorbell push arrived for a camera.
   | { type: 'motion' | 'ding'; cameraId: number; cameraName: string }

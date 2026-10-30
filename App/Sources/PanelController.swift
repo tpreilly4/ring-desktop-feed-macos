@@ -15,6 +15,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var lastHidden = Date.distantPast
     private var animating = false
     private var signInWindow: NSWindow?
+    private var settingsWindow: NSWindow?
     private var dragMonitor: Any?
     private var motionUntil = Date.distantPast
     private var dingUntil = Date.distantPast
@@ -60,7 +61,8 @@ final class PanelController: NSObject, NSWindowDelegate {
             reattach: { [weak self] in self?.reattach() },
             close: { [weak self] in self?.hide() },
             toggleOnTop: { [weak self] in self?.toggleOnTop() },
-            signIn: { [weak self] in self?.showSignIn() }
+            signIn: { [weak self] in self?.showSignIn() },
+            settings: { [weak self] in self?.showSettings() }
         )
         let root = FeedPanelView(viewer: viewer, panel: state, actions: actions) { [weak self] size in
             self?.attachedSizeChanged(size)
@@ -97,7 +99,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         let now = Date()
         let lostContact: Bool = switch viewer.helper.state {
         case .failed: true
-        case .ready: viewer.error != nil
+        case .ready: !viewer.helper.ringReachable || viewer.error != nil
         case .starting: false
         }
         let title = NSMutableAttributedString(string: now < dingUntil ? "🔔" : "🏠")
@@ -353,7 +355,7 @@ final class PanelController: NSObject, NSWindowDelegate {
 
     // MARK: Sign-in
 
-    private func showSignIn() {
+    func showSignIn() {
         hide()
         if signInWindow == nil {
             let window = NSWindow(
@@ -375,12 +377,39 @@ final class PanelController: NSObject, NSWindowDelegate {
         NSApp.activate()
         signInWindow?.makeKeyAndOrderFront(nil)
     }
+
+    // MARK: Settings
+
+    private func showSettings() {
+        hide()
+        if settingsWindow == nil {
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 380, height: 240),
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            window.title = "Ring Desktop Feed Settings"
+            window.isReleasedWhenClosed = false
+            window.contentViewController = NSHostingController(
+                rootView: SettingsView(
+                    viewer: viewer,
+                    toggleOnTop: { [weak self] in self?.toggleOnTop() },
+                    signIn: { [weak self] in self?.showSignIn() }
+                )
+            )
+            window.center()
+            settingsWindow = window
+        }
+        NSApp.activate()
+        settingsWindow?.makeKeyAndOrderFront(nil)
+    }
 }
 
 #if DEBUG
 /// Lets a terminal drive the panel and see where it lands, for debugging
 /// layout without clicking:
-///   swift scripts/panel-debug.swift open|detach|reattach|hide
+///   swift scripts/panel-debug.swift open|detach|reattach|hide|settings
 /// Frames are logged under the "panel" category.
 extension PanelController {
     private static let logger = Logger(subsystem: "com.tompreilly.ringdesktopfeed", category: "panel")
@@ -400,6 +429,7 @@ extension PanelController {
         case "detach": detach()
         case "reattach": reattach()
         case "hide": hide()
+        case "settings": showSettings()
         default: break
         }
         logFrame("after \(command ?? "?")")

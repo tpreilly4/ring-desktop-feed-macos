@@ -4,7 +4,14 @@ A macOS menu bar app for watching your Ring cameras.
 
 > **Unofficial.** This uses Ring's unofficial API through [`ring-client-api`](https://github.com/dgreif/ring). It isn't affiliated with, endorsed by or supported by Ring or Amazon, and it may break whenever Ring changes its API.
 
-Status: sign in, watch live from the menu bar or a floating mini-player, see motion on the menu bar icon, and get a notification when the doorbell rings. Settings and polish come next. See [docs/DESIGN.md](docs/DESIGN.md).
+## What it does
+
+- Watch either camera live from the menu bar, or pop the view out into a floating mini-player. Video comes straight from Ring, with no re-encoding.
+- See motion at a glance: the menu bar icon gets a red dot for 5 minutes.
+- Get a notification when the doorbell rings, and click it to watch live.
+- Optionally launch at login, from Settings (the ⋯ menu in the panel).
+
+Design notes are in [docs/DESIGN.md](docs/DESIGN.md).
 
 ## How it works
 
@@ -40,6 +47,13 @@ Then open `http://127.0.0.1:8787/player#token=dev` in Safari and pick a camera.
 - The refresh token is stored in your macOS Keychain (or `helper/dev.token` in dev mode).
 - The helper only listens on loopback and requires a random per-launch token.
 - Logs go to `~/Library/Logs/RingDesktopFeed/`.
+
+## Troubleshooting
+
+- **The icon shows an orange ⚠︎:** the app can't reach Ring. It keeps checking and clears the warning by itself once Ring is back.
+- **The sign-in window opens by itself:** Ring ended your session. Motion and doorbell alerts are paused until you sign in again.
+- **macOS keeps asking for Keychain access:** the app is probably signed without a team. Check `DEVELOPMENT_TEAM` in `Local.xcconfig` and rebuild.
+- **No alerts:** the app has to be running to get them. Check `helper.log` in the logs folder for lines like `motion on Front Door`.
 
 ## License
 

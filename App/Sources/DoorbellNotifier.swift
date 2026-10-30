@@ -24,6 +24,13 @@ final class DoorbellNotifier: NSObject, UNUserNotificationCenterDelegate {
         center.add(UNNotificationRequest(identifier: "ding-\(cameraId)", content: content, trigger: nil))
     }
 
+    func signInExpired() {
+        let content = UNMutableNotificationContent()
+        content.title = "Sign in to Ring again"
+        content.body = "Ring ended your session, so camera alerts are paused until you sign back in."
+        center.add(UNNotificationRequest(identifier: "sign-in-expired", content: content, trigger: nil))
+    }
+
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse

@@ -82,6 +82,8 @@ struct HelperClient: Sendable {
     private func request<T: Decodable>(_ method: String, _ path: String, body: [String: String]? = nil) async throws -> T {
         var request = URLRequest(url: baseURL.appending(path: path))
         request.httpMethod = method
+        // Offline, the helper's requests to Ring never return. Don't wait forever.
+        request.timeoutInterval = 30
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")

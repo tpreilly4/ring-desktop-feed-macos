@@ -21,10 +21,14 @@ final class Helper {
 
     /// Called on the main actor for every activity event.
     var onActivity: ((Activity) -> Void)?
+    /// Ring stopped accepting our token, so the user has to sign in again.
+    var onSignInExpired: (() -> Void)?
 
     private(set) var state: State = .starting
     /// Bumped whenever the Ring account signs in or out, so views refetch.
     private(set) var accountChanges = 0
+    /// False while the helper can't get through to Ring.
+    private(set) var ringReachable = true
 
     /// Random per launch; every API call and the player must present it.
     let authToken = UUID().uuidString + UUID().uuidString
@@ -32,6 +36,7 @@ final class Helper {
     private var process: Process?
     private var stdin: FileHandle?
     private var restartDelay: Duration = .seconds(1)
+    private var failedStarts = 0
     private let logger = Logger(subsystem: "com.tompreilly.ringdesktopfeed", category: "helper")
 
     var client: HelperClient? {
@@ -42,6 +47,7 @@ final class Helper {
     func start() {
         guard process == nil else { return }
         state = .starting
+        ringReachable = true
 
         guard let dir = Bundle.main.resourceURL?.appending(path: "helper"),
               FileManager.default.isExecutableFile(atPath: dir.appending(path: "node").path)
@@ -49,6 +55,10 @@ final class Helper {
             state = .failed("The helper isn't bundled. Run scripts/bootstrap.sh and rebuild.")
             return
         }
+
+        // Before launching: this can wait on a Keychain prompt, and the helper
+        // gives up if its config takes too long to arrive.
+        let refreshToken = Keychain.readRefreshToken()
 
         let process = Process()
         process.executableURL = dir.appending(path: "node")
@@ -83,7 +93,7 @@ final class Helper {
 
         let config: [String: Any?] = [
             "authToken": authToken,
-            "refreshToken": Keychain.readRefreshToken(),
+            "refreshToken": refreshToken,
             "port": 0,
         ]
         var data = try! JSONSerialization.data(withJSONObject: config.compactMapValues { $0 })
@@ -94,6 +104,13 @@ final class Helper {
 
     func noteAccountChanged() {
         accountChanges += 1
+    }
+
+    /// Starts over after the helper has given up restarting.
+    func retry() {
+        failedStarts = 0
+        restartDelay = .seconds(1)
+        start()
     }
 
     func stop() {
@@ -112,12 +129,21 @@ final class Helper {
             if let port = event.port {
                 state = .ready(port: port)
                 restartDelay = .seconds(1)
+                failedStarts = 0
             }
         case "refreshToken":
             if let value = event.value { Keychain.saveRefreshToken(value) }
         case "signedOut":
-            Keychain.deleteRefreshToken()
+            // On expiry the token stays: if Ring only refused it because of a
+            // hiccup on their side, the next launch recovers without signing in.
+            if event.reason == "expired" {
+                onSignInExpired?()
+            } else {
+                Keychain.deleteRefreshToken()
+            }
             accountChanges += 1
+        case "reachability":
+            ringReachable = event.reachable ?? true
         case "error":
             logger.error("Helper error: \(event.message ?? "")")
         case "motion":
@@ -136,6 +162,12 @@ final class Helper {
     private func didTerminate(status: Int32) {
         logger.error("Helper exited with status \(status); restarting")
         process = nil
+        failedStarts += 1
+        // It isn't going to fix itself; say so instead of spinning forever.
+        guard failedStarts < Self.maxFailedStarts else {
+            state = .failed("The helper keeps stopping. Its log is in ~/Library/Logs/RingDesktopFeed.")
+            return
+        }
         state = .starting
         let delay = restartDelay
         restartDelay = min(restartDelay * 2, .seconds(30))
@@ -145,9 +177,14 @@ final class Helper {
         }
     }
 
+    private static let maxFailedStarts = 5
+
+    static var logDirectory: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/RingDesktopFeed")
+    }
+
     private static func openLogFile() -> FileHandle? {
-        let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appending(path: "Library/Logs/RingDesktopFeed")
+        let dir = logDirectory
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let file = dir.appending(path: "helper.log")
         if !FileManager.default.fileExists(atPath: file.path) {
@@ -182,4 +219,6 @@ private struct HelperEvent: Decodable {
     let message: String?
     let cameraId: Int?
     let cameraName: String?
+    let reason: String?
+    let reachable: Bool?
 }
