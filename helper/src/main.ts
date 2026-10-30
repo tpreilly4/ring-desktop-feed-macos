@@ -8,10 +8,18 @@ import { createHelperServer } from './server.js'
 
 const config = await readConfig()
 
+function connect(token: string) {
+  const account = new RingAccount(token, persistRefreshToken)
+  account
+    .watchEvents(({ kind, cameraId, cameraName }) => emit({ type: kind, cameraId, cameraName }))
+    .catch((e) => log('could not start watching cameras', e))
+  return account
+}
+
 const app = new HelperApp(
   {
     signIn: new SignInFlow(),
-    connect: (token) => new RingAccount(token, persistRefreshToken),
+    connect,
     persistRefreshToken,
     onSignedOut: () => emit({ type: 'signedOut', reason: 'user' }),
   },

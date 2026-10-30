@@ -13,6 +13,15 @@ final class Helper {
         case failed(String)
     }
 
+    /// Camera activity the helper reports.
+    enum Activity {
+        case motion(cameraId: Int, cameraName: String)
+        case ding(cameraId: Int, cameraName: String)
+    }
+
+    /// Called on the main actor for every activity event.
+    var onActivity: ((Activity) -> Void)?
+
     private(set) var state: State = .starting
     /// Bumped whenever the Ring account signs in or out, so views refetch.
     private(set) var accountChanges = 0
@@ -111,6 +120,14 @@ final class Helper {
             accountChanges += 1
         case "error":
             logger.error("Helper error: \(event.message ?? "")")
+        case "motion":
+            if let id = event.cameraId {
+                onActivity?(.motion(cameraId: id, cameraName: event.cameraName ?? "Camera"))
+            }
+        case "ding":
+            if let id = event.cameraId {
+                onActivity?(.ding(cameraId: id, cameraName: event.cameraName ?? "Camera"))
+            }
         default:
             break
         }
@@ -163,4 +180,6 @@ private struct HelperEvent: Decodable {
     let port: Int?
     let value: String?
     let message: String?
+    let cameraId: Int?
+    let cameraName: String?
 }

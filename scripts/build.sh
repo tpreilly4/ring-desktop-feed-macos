@@ -3,5 +3,5 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 xcodebuild -project RingDesktopFeed.xcodeproj -scheme RingDesktopFeed -configuration Debug \
-  -derivedDataPath build/DerivedData build | tail -20
+  -derivedDataPath build/DerivedData -allowProvisioningUpdates build | tail -20
 echo "App: build/DerivedData/Build/Products/Debug/Ring Desktop Feed.app"

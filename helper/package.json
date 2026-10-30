@@ -23,5 +23,8 @@
     "@types/node": "^20",
     "tsx": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "@eneris/push-receiver": "4.4.0"
   }
 }

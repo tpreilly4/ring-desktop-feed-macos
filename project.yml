@@ -27,9 +27,10 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Ring Desktop Feed
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
         INFOPLIST_FILE: App/Info.plist
-        # Signed to run locally until a team is set in Local.xcconfig.
+        # Team comes from Local.xcconfig (DEVELOPMENT_TEAM). A stable signature
+        # stops macOS asking for Keychain access after every rebuild.
         CODE_SIGN_STYLE: Automatic
-        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_IDENTITY: Apple Development
         # The embed script reads build/ and vendor/ from the repo.
         ENABLE_USER_SCRIPT_SANDBOXING: NO
     postBuildScripts:

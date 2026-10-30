@@ -1,10 +1,10 @@
 # Ring Desktop Feed
 
-A macOS menu bar app for watching your Ring cameras live, with a widget on the way.
+A macOS menu bar app for watching your Ring cameras.
 
 > **Unofficial.** This uses Ring's unofficial API through [`ring-client-api`](https://github.com/dgreif/ring). It isn't affiliated with, endorsed by or supported by Ring or Amazon, and it may break whenever Ring changes its API.
 
-Status: **tracer bullet**. You can sign in and watch one camera at a time in the menu bar popover. The widget, motion snapshots, the floating player and settings come next. See [docs/DESIGN.md](docs/DESIGN.md).
+Status: sign in, watch live from the menu bar or a floating mini-player, see motion on the menu bar icon, and get a notification when the doorbell rings. Settings and polish come next. See [docs/DESIGN.md](docs/DESIGN.md).
 
 ## How it works
 
@@ -12,7 +12,7 @@ A small TypeScript helper (bundled with its own Node runtime) signs in to Ring a
 
 ## Building
 
-You need macOS 26+, Xcode, and [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
+You need macOS 26+, Xcode signed in with an Apple Developer account, and [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`). Put your team ID in `Local.xcconfig` (created by bootstrap): a stable signature stops macOS asking for Keychain access after every rebuild.
 
 ```bash
 scripts/bootstrap.sh   # fetches pinned Node, builds the helper, generates the Xcode project

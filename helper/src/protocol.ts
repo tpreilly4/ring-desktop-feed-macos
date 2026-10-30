@@ -7,6 +7,8 @@ export type HelperEvent =
   | { type: 'refreshToken'; value: string }
   | { type: 'signedOut'; reason: string }
   | { type: 'error'; message: string }
+  // A motion or doorbell push arrived for a camera.
+  | { type: 'motion' | 'ding'; cameraId: number; cameraName: string }
 
 export function emit(event: HelperEvent) {
   process.stdout.write(JSON.stringify(event) + '\n')

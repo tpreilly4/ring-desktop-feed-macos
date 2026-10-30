@@ -1,4 +1,4 @@
-// Copy to Local.xcconfig (git-ignored). Needed once the widget exists,
-// because the app and widget share an App Group.
+// Copy to Local.xcconfig (git-ignored). A real team gives the app a stable
+// signature, so macOS doesn't ask for Keychain access after every rebuild.
 // Find your team ID at https://developer.apple.com/account → Membership.
 DEVELOPMENT_TEAM =

@@ -33,7 +33,7 @@ cp -R helper/dist helper/player helper/package.json helper/package-lock.json bui
 
 if [ ! -f Local.xcconfig ]; then
   cp Local.xcconfig.example Local.xcconfig
-  echo "Created Local.xcconfig — add your DEVELOPMENT_TEAM there when you need the widget."
+  echo "Created Local.xcconfig — add your DEVELOPMENT_TEAM there."
 fi
 
 xcodegen generate

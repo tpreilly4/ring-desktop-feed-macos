@@ -16,6 +16,9 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var animating = false
     private var signInWindow: NSWindow?
     private var dragMonitor: Any?
+    private var motionUntil = Date.distantPast
+    private var dingUntil = Date.distantPast
+    private var iconTimer: Timer?
     private var drag: (start: NSPoint, origin: NSPoint, moving: Bool)?
 
     /// Gap between the menu bar and the attached panel.
@@ -35,7 +38,6 @@ final class PanelController: NSObject, NSWindowDelegate {
         super.init()
 
         if let button = statusItem.button {
-            button.title = "🏠"
             button.setAccessibilityLabel("Ring Desktop Feed")
             button.target = self
             button.action = #selector(statusItemClicked)
@@ -66,12 +68,75 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.contentViewController = NSHostingController(rootView: root)
         applyMode()
         watchForWindowDrags()
+        updateIcon()
+        // Expire the motion dot / doorbell icon, and notice lost contact.
+        iconTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updateIcon() }
+        }
         #if DEBUG
         listenForDebugCommands()
         #endif
     }
 
+    // MARK: Menu bar icon
+
+    /// Motion shows a dot for 5 minutes; a doorbell press swaps in 🔔 for a
+    /// minute.
+    func noteActivity(_ activity: Helper.Activity) {
+        switch activity {
+        case .motion: motionUntil = Date().addingTimeInterval(5 * 60)
+        case .ding:
+            motionUntil = Date().addingTimeInterval(5 * 60)
+            dingUntil = Date().addingTimeInterval(60)
+        }
+        updateIcon()
+    }
+
+    private func updateIcon() {
+        guard let button = statusItem.button else { return }
+        let now = Date()
+        let lostContact: Bool = switch viewer.helper.state {
+        case .failed: true
+        case .ready: viewer.error != nil
+        case .starting: false
+        }
+        let title = NSMutableAttributedString(string: now < dingUntil ? "🔔" : "🏠")
+        let badge: (String, NSColor)? =
+            if lostContact { ("⚠︎", .systemOrange) }
+            else if now < motionUntil { ("●", .systemRed) }
+            else { nil }
+        if let (symbol, color) = badge {
+            title.append(NSAttributedString(string: symbol, attributes: [
+                .font: NSFont.systemFont(ofSize: 8, weight: .bold),
+                .foregroundColor: color,
+                .baselineOffset: 6,
+            ]))
+        }
+        button.attributedTitle = title
+        button.toolTip = lostContact ? "Ring Desktop Feed: can't reach Ring" : "Ring Desktop Feed"
+    }
+
     // MARK: Showing and hiding
+
+    /// Opens the floating mini-player on one camera (from a doorbell
+    /// notification).
+    func showLive(cameraId: Int) {
+        viewer.selectedId = cameraId
+        switch (state.visible, state.mode) {
+        case (true, .detached):
+            break
+        case (true, .attached):
+            detach()
+        case (false, _):
+            state.mode = .detached
+            applyMode()
+            var frame = attachedFrame(for: attachedSize)
+            frame.origin.y -= 28
+            panel.setFrame(frame, display: true)
+            state.visible = true
+        }
+        panel.makeKeyAndOrderFront(nil)
+    }
 
     @objc private func statusItemClicked() {
         switch (state.visible, state.mode) {

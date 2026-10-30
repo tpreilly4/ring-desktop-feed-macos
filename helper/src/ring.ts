@@ -1,4 +1,4 @@
-import { RingApi, type RingCamera } from 'ring-client-api'
+import { PushNotificationAction, RingApi, type RingCamera } from 'ring-client-api'
 import { log } from './protocol.js'
 
 type SimpleWebRtcSession = ReturnType<RingCamera['createSimpleWebRtcSession']>
@@ -26,6 +26,12 @@ export interface RingGateway {
   startLiveView(cameraId: number, offerSdp: string): Promise<LiveViewStart>
   endLiveView(sessionId: string): Promise<void>
   disconnect(): Promise<void>
+}
+
+export interface CameraEvent {
+  kind: 'motion' | 'ding'
+  cameraId: number
+  cameraName: string
 }
 
 export class RingAccount implements RingGateway {
@@ -67,6 +73,18 @@ export class RingAccount implements RingGateway {
     this.sessions.delete(sessionId)
     await session.end().catch((e) => log('failed to end live view', e))
     log(`live view ended: ${sessionId}`)
+  }
+
+  // Reports motion and doorbell pushes for as long as this account is connected.
+  async watchEvents(onEvent: (event: CameraEvent) => void) {
+    const cameras = await this.api.getCameras()
+    for (const camera of cameras) {
+      camera.onNewNotification.subscribe((push) => {
+        const kind = push.android_config.category === PushNotificationAction.Ding ? 'ding' : 'motion'
+        log(`${kind} on ${camera.name}`)
+        onEvent({ kind, cameraId: camera.id, cameraName: camera.name })
+      })
+    }
   }
 
   async disconnect() {
